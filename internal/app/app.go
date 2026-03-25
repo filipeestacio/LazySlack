@@ -364,3 +364,16 @@ func (m Model) addReaction(channelID, messageTS, emoji string) tea.Cmd {
 		return reactionAddedMsg{}
 	}
 }
+
+type teaAdapter struct{ m Model }
+
+func (a teaAdapter) Init() tea.Cmd { return a.m.Init() }
+
+func (a teaAdapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m, cmd := a.m.Update(msg)
+	return teaAdapter{m}, cmd
+}
+
+func (a teaAdapter) View() string { return a.m.View() }
+
+func AsTeaModel(m Model) tea.Model { return teaAdapter{m} }
