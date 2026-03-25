@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log"
 	"os/exec"
 	"strings"
 
@@ -182,7 +183,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case errMsg:
+		log.Printf("app error: %v", msg.err)
 		m.statusbar.SetConnected(false)
+		m.statusbar.SetError(msg.err.Error())
 		return m, nil
 	}
 
@@ -251,8 +254,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	sidebarView := m.sidebar.View()
-	messagesView := m.messages.View()
+	contentH := m.height - 1
+	if contentH < 1 {
+		contentH = 1
+	}
+	sidebarView := lipgloss.NewStyle().Width(30).MaxHeight(contentH).Render(m.sidebar.View())
+	messagesView := lipgloss.NewStyle().Width(m.width - 30).Height(contentH).Render(m.messages.View())
 
 	var content string
 	if m.showThread {
@@ -287,10 +294,13 @@ func (m Model) loadChannels() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
+		log.Printf("loading channels...")
 		channels, err := m.client.ListChannels()
 		if err != nil {
+			log.Printf("error loading channels: %v", err)
 			return errMsg{err}
 		}
+		log.Printf("loaded %d channels", len(channels))
 		return channelsLoadedMsg{channels}
 	}
 }

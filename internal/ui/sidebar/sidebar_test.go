@@ -14,9 +14,12 @@ func TestNavigateDown(t *testing.T) {
 		{ID: "C2", Name: "random"},
 	})
 
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	if m.CursorIndex() != 1 {
-		t.Errorf("cursor = %d, want 1", m.CursorIndex())
+		t.Errorf("initial cursor = %d, want 1 (first non-section item)", m.CursorIndex())
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	if m.CursorIndex() != 2 {
+		t.Errorf("cursor after j = %d, want 2", m.CursorIndex())
 	}
 }
 
@@ -29,8 +32,8 @@ func TestNavigateUp(t *testing.T) {
 
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	if m.CursorIndex() != 0 {
-		t.Errorf("cursor = %d, want 0", m.CursorIndex())
+	if m.CursorIndex() != 1 {
+		t.Errorf("cursor = %d, want 1 (should not land on section header)", m.CursorIndex())
 	}
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -22,6 +23,8 @@ func main() {
 		}
 		defer f.Close()
 		log.SetOutput(f)
+	} else {
+		log.SetOutput(io.Discard)
 	}
 
 	cfg, err := config.Load()

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	slackapi "github.com/slack-go/slack"
 )
@@ -45,6 +46,11 @@ func NewClient(token, cookie string, opts ...ClientOption) *Client {
 	if cookie != "" {
 		options = append(options, slackapi.OptionHTTPClient(&http.Client{
 			Transport: &cookieTransport{cookie: cookie, token: token},
+			Timeout:   30 * time.Second,
+		}))
+	} else {
+		options = append(options, slackapi.OptionHTTPClient(&http.Client{
+			Timeout: 30 * time.Second,
 		}))
 	}
 	if c.baseURL != "" {
@@ -61,7 +67,11 @@ type cookieTransport struct {
 }
 
 func (t *cookieTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("Cookie", t.cookie)
+	cookie := t.cookie
+	if !strings.HasPrefix(cookie, "d=") {
+		cookie = "d=" + cookie
+	}
+	req.Header.Set("Cookie", cookie)
 	if t.token != "" {
 		req.Header.Set("Authorization", "Bearer "+t.token)
 	}
@@ -86,13 +96,17 @@ func (c *Client) ListChannels() ([]Channel, error) {
 	params := &slackapi.GetConversationsParameters{
 		Types:           []string{"public_channel", "private_channel"},
 		ExcludeArchived: true,
-		Limit:           1000,
+		Limit:           200,
 	}
 
 	var channels []Channel
-	for {
-		convs, cursor, err := c.api.GetConversations(params)
+	maxPages := 3
+	for page := 0; page < maxPages; page++ {
+		convs, cursor, err := c.getConversationsWithRetry(params)
 		if err != nil {
+			if len(channels) > 0 {
+					return channels, nil
+			}
 			return nil, err
 		}
 		for _, ch := range convs {
@@ -115,15 +129,19 @@ func (c *Client) ListChannels() ([]Channel, error) {
 func (c *Client) ListDMs() ([]Conversation, error) {
 	params := &slackapi.GetConversationsParameters{
 		Types: []string{"im", "mpim"},
-		Limit: 200,
+		Limit: 100,
 	}
 
-	var convs []Conversation
-	chans, _, err := c.api.GetConversations(params)
+	chans, _, err := c.getConversationsWithRetry(params)
 	if err != nil {
 		return nil, err
 	}
+
+	var convs []Conversation
 	for _, ch := range chans {
+		if ch.User == "" {
+			continue
+		}
 		convs = append(convs, Conversation{
 			ID:     ch.ID,
 			UserID: ch.User,
@@ -131,6 +149,31 @@ func (c *Client) ListDMs() ([]Conversation, error) {
 		})
 	}
 	return convs, nil
+}
+
+func (c *Client) getConversationsWithRetry(params *slackapi.GetConversationsParameters) ([]slackapi.Channel, string, error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		convs, cursor, err := c.api.GetConversations(params)
+		if err == nil {
+			return convs, cursor, nil
+		}
+		if rateLimited, delay := isRateLimited(err); rateLimited {
+			time.Sleep(delay)
+			continue
+		}
+		return nil, "", err
+	}
+	return nil, "", fmt.Errorf("rate limited after 3 retries")
+}
+
+func isRateLimited(err error) (bool, time.Duration) {
+	if rlErr, ok := err.(*slackapi.RateLimitedError); ok {
+		return true, rlErr.RetryAfter
+	}
+	if strings.Contains(err.Error(), "rate limit") {
+		return true, 5 * time.Second
+	}
+	return false, 0
 }
 
 func (c *Client) GetHistory(channelID string, cursor string) (*HistoryResult, error) {

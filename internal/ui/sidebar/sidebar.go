@@ -26,6 +26,7 @@ type Model struct {
 	items        []Item
 	filtered     []int
 	cursor       int
+	offset       int
 	filtering    bool
 	filterText   string
 	channelsOpen bool
@@ -58,12 +59,19 @@ func (m *Model) SetChannels(channels []slack.Channel) {
 }
 
 func (m *Model) SetDMs(convs []slack.Conversation, resolve func(string) string) {
+	savedCursor := m.cursor
+	savedOffset := m.offset
 	m.items = append(m.items, Item{Name: "Direct Messages", IsSection: true})
 	for _, c := range convs {
 		name := resolve(c.UserID)
+		if name == "" {
+			continue
+		}
 		m.items = append(m.items, Item{ID: c.ID, Name: name})
 	}
 	m.resetFilter()
+	m.cursor = savedCursor
+	m.offset = savedOffset
 }
 
 func (m *Model) SetHeight(h int) { m.height = h }
@@ -100,23 +108,31 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) updateNormal(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
+		prev := m.cursor
 		if m.cursor < len(m.filtered)-1 {
 			m.cursor++
-			if m.items[m.filtered[m.cursor]].IsSection {
+			if m.cursor < len(m.filtered) && m.items[m.filtered[m.cursor]].IsSection {
 				if m.cursor < len(m.filtered)-1 {
 					m.cursor++
+				} else {
+					m.cursor = prev
 				}
 			}
 		}
+		m.scrollToCursor()
 	case "k", "up":
+		prev := m.cursor
 		if m.cursor > 0 {
 			m.cursor--
 			if m.items[m.filtered[m.cursor]].IsSection {
 				if m.cursor > 0 {
 					m.cursor--
+				} else {
+					m.cursor = prev
 				}
 			}
 		}
+		m.scrollToCursor()
 	case "g":
 		m.cursor = 0
 		if len(m.filtered) > 0 && m.items[m.filtered[0]].IsSection {
@@ -180,6 +196,12 @@ func (m *Model) resetFilter() {
 		m.filtered[i] = i
 	}
 	m.cursor = 0
+	for i, idx := range m.filtered {
+		if !m.items[idx].IsSection {
+			m.cursor = i
+			break
+		}
+	}
 }
 
 func (m *Model) applyFilter() {
@@ -235,6 +257,19 @@ func (m *Model) rebuildFiltered() {
 	}
 }
 
+func (m *Model) scrollToCursor() {
+	viewHeight := m.height
+	if viewHeight <= 0 {
+		viewHeight = 30
+	}
+	if m.cursor < m.offset {
+		m.offset = m.cursor
+	}
+	if m.cursor >= m.offset+viewHeight {
+		m.offset = m.cursor - viewHeight + 1
+	}
+}
+
 func (m Model) View() string {
 	var b strings.Builder
 
@@ -243,10 +278,25 @@ func (m Model) View() string {
 		b.WriteString("\n")
 	}
 
-	for i, idx := range m.filtered {
+	viewHeight := m.height
+	if viewHeight <= 0 {
+		viewHeight = 30
+	}
+
+	end := m.offset + viewHeight
+	if end > len(m.filtered) {
+		end = len(m.filtered)
+	}
+
+	for i := m.offset; i < end; i++ {
+		idx := m.filtered[i]
 		item := m.items[idx]
 		if item.IsSection {
-			b.WriteString(styles.SidebarSection.Render(item.Name))
+			sectionStyle := styles.SidebarSection.Copy().MarginTop(0)
+			if i > 0 && i > m.offset {
+				b.WriteString("\n")
+			}
+			b.WriteString(sectionStyle.Render(item.Name))
 		} else if i == m.cursor {
 			b.WriteString(styles.SidebarSelected.Render(item.Name))
 		} else {

@@ -10,6 +10,7 @@ type Model struct {
 	connected   bool
 	rateLimited bool
 	hints       string
+	lastError   string
 }
 
 func New(workspace string) Model {
@@ -20,7 +21,8 @@ func New(workspace string) Model {
 	}
 }
 
-func (m *Model) SetConnected(v bool)   { m.connected = v }
+func (m *Model) SetConnected(v bool)    { m.connected = v }
+func (m *Model) SetError(err string)    { m.lastError = err }
 func (m *Model) SetRateLimited(v bool) { m.rateLimited = v }
 func (m *Model) SetHints(h string)     { m.hints = h }
 
@@ -28,7 +30,10 @@ func (m Model) View(width int) string {
 	status := "●"
 	statusColor := lipgloss.Color("114")
 	if !m.connected {
-		status = "○ disconnected"
+		status = "○ " + m.lastError
+		if status == "○ " {
+			status = "○ disconnected"
+		}
 		statusColor = lipgloss.Color("196")
 	} else if m.rateLimited {
 		status = "◐ rate limited"
