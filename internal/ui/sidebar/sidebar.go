@@ -283,18 +283,18 @@ func (m Model) View() string {
 		viewHeight = 30
 	}
 
-	end := m.offset + viewHeight
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
-
-	for i := m.offset; i < end; i++ {
+	lines := 0
+	for i := m.offset; i < len(m.filtered) && lines < viewHeight; i++ {
 		idx := m.filtered[i]
 		item := m.items[idx]
 		if item.IsSection {
 			sectionStyle := styles.SidebarSection.Copy().MarginTop(0)
 			if i > 0 && i > m.offset {
+				if lines+2 > viewHeight {
+					break
+				}
 				b.WriteString("\n")
+				lines++
 			}
 			b.WriteString(sectionStyle.Render(item.Name))
 		} else if i == m.cursor {
@@ -307,7 +307,8 @@ func (m Model) View() string {
 			b.WriteString(style.Render(item.Name))
 		}
 		b.WriteString("\n")
+		lines++
 	}
 
-	return lipgloss.NewStyle().Width(30).Render(b.String())
+	return lipgloss.NewStyle().Width(30).Height(viewHeight).Render(strings.TrimRight(b.String(), "\n"))
 }

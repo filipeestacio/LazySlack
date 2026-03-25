@@ -14,6 +14,7 @@ import (
 	"github.com/filipeestacio/lazyslack/internal/ui/messages"
 	"github.com/filipeestacio/lazyslack/internal/ui/sidebar"
 	"github.com/filipeestacio/lazyslack/internal/ui/statusbar"
+	"github.com/filipeestacio/lazyslack/internal/ui/styles"
 	"github.com/filipeestacio/lazyslack/internal/ui/thread"
 )
 
@@ -85,9 +86,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		contentH := msg.Height - 1
+		contentH := msg.Height - 3
 		m.sidebar.SetHeight(contentH)
-		m.messages.SetSize(msg.Width-30, contentH)
+		m.messages.SetSize(msg.Width-30-4, contentH)
 		m.thread.SetSize(40, contentH)
 		m.help.SetSize(msg.Width, msg.Height)
 		return m, nil
@@ -254,12 +255,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	contentH := m.height - 1
-	if contentH < 1 {
-		contentH = 1
+	innerH := m.height - 3
+	if innerH < 1 {
+		innerH = 1
 	}
-	sidebarView := lipgloss.NewStyle().Width(30).MaxHeight(contentH).Render(m.sidebar.View())
-	messagesView := lipgloss.NewStyle().Width(m.width - 30).Height(contentH).Render(m.messages.View())
+	sidebarW := 30
+	msgsW := m.width - sidebarW - 4
+
+	sidebarBorder := styles.UnfocusedBorder
+	msgsBorder := styles.UnfocusedBorder
+	if m.focus == focusSidebar {
+		sidebarBorder = styles.FocusedBorder
+	} else if m.focus == focusMessages {
+		msgsBorder = styles.FocusedBorder
+	}
+
+	sidebarView := sidebarBorder.Width(sidebarW).Render(m.sidebar.View())
+	messagesView := msgsBorder.Width(msgsW).Height(innerH).Render(m.messages.View())
 
 	var content string
 	if m.showThread {

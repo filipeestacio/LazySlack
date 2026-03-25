@@ -72,6 +72,14 @@ var (
 
 	UnreadDot = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("212"))
+
+	FocusedBorder = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("63"))
+
+	UnfocusedBorder = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240"))
 )
 
 var UsernameColors = []lipgloss.Color{
