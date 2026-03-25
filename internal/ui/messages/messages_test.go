@@ -21,19 +21,23 @@ func TestSetMessages(t *testing.T) {
 func TestNavigateMessages(t *testing.T) {
 	m := New(nil, nil)
 	m.SetMessages([]slack.Message{
-		{Text: "first", Timestamp: "1706000001.000000"},
-		{Text: "second", Timestamp: "1706000002.000000"},
 		{Text: "third", Timestamp: "1706000003.000000"},
+		{Text: "second", Timestamp: "1706000002.000000"},
+		{Text: "first", Timestamp: "1706000001.000000"},
 	})
 
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	if m.cursor != 1 {
-		t.Errorf("cursor = %d, want 1", m.cursor)
+	if m.cursor != 2 {
+		t.Errorf("initial cursor = %d, want 2 (newest message)", m.cursor)
 	}
 
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	if m.cursor != 0 {
-		t.Errorf("cursor = %d, want 0", m.cursor)
+	if m.cursor != 1 {
+		t.Errorf("cursor after k = %d, want 1", m.cursor)
+	}
+
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	if m.cursor != 2 {
+		t.Errorf("cursor after j = %d, want 2", m.cursor)
 	}
 }
 

@@ -29,7 +29,10 @@ type channelsLoadedMsg struct {
 type dmsLoadedMsg struct {
 	convs []slack.Conversation
 }
-type historyLoadedMsg struct{ result *slack.HistoryResult }
+type historyLoadedMsg struct {
+	result *slack.HistoryResult
+	append bool
+}
 type threadLoadedMsg struct{ messages []slack.Message }
 type messageSentMsg struct{}
 type reactionAddedMsg struct{}
@@ -50,6 +53,8 @@ type Model struct {
 	showThread bool
 
 	currentChannelID string
+	historyCursor    string
+	hasMoreHistory   bool
 
 	sidebar   sidebar.Model
 	messages  messages.Model
@@ -114,7 +119,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case historyLoadedMsg:
-		m.messages.SetMessages(msg.result.Messages)
+		if msg.append {
+			m.messages.PrependMessages(msg.result.Messages)
+		} else {
+			m.messages.SetMessages(msg.result.Messages)
+		}
+		m.historyCursor = msg.result.Cursor
+		m.hasMoreHistory = msg.result.HasMore
+		return m, nil
+
+	case messages.RequestPaginationMsg:
+		if m.hasMoreHistory && m.historyCursor != "" {
+			return m, m.fetchHistory(m.currentChannelID, m.historyCursor, true)
+		}
 		return m, nil
 
 	case threadLoadedMsg:
@@ -129,7 +146,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.messages.SetChannel(msg.ID, msg.Name)
 		m.currentChannelID = msg.ID
 		m.showThread = false
-		return m, m.fetchHistory(msg.ID)
+		m.historyCursor = ""
+		m.hasMoreHistory = false
+		return m, m.fetchHistory(msg.ID, "", false)
 
 	case messages.OpenThreadMsg:
 		m.showThread = true
@@ -344,16 +363,16 @@ func (m Model) loadDMs() tea.Cmd {
 	}
 }
 
-func (m Model) fetchHistory(channelID string) tea.Cmd {
+func (m Model) fetchHistory(channelID, cursor string, appendMode bool) tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		result, err := m.client.GetHistory(channelID, "")
+		result, err := m.client.GetHistory(channelID, cursor)
 		if err != nil {
 			return errMsg{err}
 		}
-		return historyLoadedMsg{result}
+		return historyLoadedMsg{result: result, append: appendMode}
 	}
 }
 

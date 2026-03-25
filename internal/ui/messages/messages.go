@@ -3,6 +3,7 @@ package messages
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -42,13 +43,29 @@ func New(renderer *slack.Renderer, resolver slack.UserResolver) Model {
 }
 
 func (m *Model) SetMessages(msgs []slack.Message) {
-	m.messages = msgs
-	m.cursor = 0
-	m.offset = 0
+	reversed := make([]slack.Message, len(msgs))
+	for i, msg := range msgs {
+		reversed[len(msgs)-1-i] = msg
+	}
+	m.messages = reversed
+	if len(m.messages) > 0 {
+		m.cursor = len(m.messages) - 1
+		m.scrollToCursor()
+	} else {
+		m.cursor = 0
+		m.offset = 0
+	}
 }
 
-func (m *Model) AppendMessages(msgs []slack.Message) {
-	m.messages = append(msgs, m.messages...)
+func (m *Model) PrependMessages(msgs []slack.Message) {
+	reversed := make([]slack.Message, len(msgs))
+	for i, msg := range msgs {
+		reversed[len(msgs)-1-i] = msg
+	}
+	added := len(reversed)
+	m.messages = append(reversed, m.messages...)
+	m.cursor += added
+	m.offset += added
 }
 
 func (m *Model) SetChannel(id, name string) {
@@ -199,7 +216,18 @@ func (m Model) View() string {
 
 	lines := 0
 	for i := m.offset; i < len(m.messages) && lines < viewH; i++ {
-		rendered := m.renderMessage(m.messages[i], i == m.cursor, contentW)
+		var prev *slack.Message
+		if i > 0 {
+			prev = &m.messages[i-1]
+		}
+		if prev != nil && !m.isSameGroup(m.messages[i], prev) {
+			if lines+1 > viewH {
+				break
+			}
+			b.WriteString("\n")
+			lines++
+		}
+		rendered := m.renderMessage(m.messages[i], prev, i == m.cursor, contentW)
 		msgLines := strings.Count(rendered, "\n") + 1
 		if lines+msgLines > viewH {
 			break
@@ -213,27 +241,47 @@ func (m Model) View() string {
 		strings.TrimRight(b.String(), "\n"))
 }
 
-func (m Model) renderMessage(msg slack.Message, selected bool, maxWidth int) string {
+func (m Model) isSameGroup(msg slack.Message, prev *slack.Message) bool {
+	if prev == nil {
+		return false
+	}
+	if msg.UserID != prev.UserID {
+		return false
+	}
+	return msg.Time().Sub(prev.Time()).Abs() < 30*time.Minute
+}
+
+func (m Model) renderMessage(msg slack.Message, prev *slack.Message, selected bool, maxWidth int) string {
 	text := msg.Text
 	if m.renderer != nil {
 		text = m.renderer.RenderPlain(text)
 	}
 
-	username := msg.UserID
-	if m.resolver != nil {
-		username = m.resolver.ResolveUser(msg.UserID)
+	textW := maxWidth - 4
+	if textW < 10 {
+		textW = 10
 	}
-	if username == "" {
-		username = msg.UserID
+	textStyle := styles.MessageText.Width(textW)
+	var line string
+
+	if m.isSameGroup(msg, prev) {
+		line = textStyle.Render(text)
+	} else {
+		username := msg.UserID
+		if m.resolver != nil {
+			username = m.resolver.ResolveUser(msg.UserID)
+		}
+		if username == "" {
+			username = msg.UserID
+		}
+
+		userStyle := styles.MessageUsername.Foreground(styles.ColorForUser(msg.UserID))
+		tsStyle := styles.MessageTimestamp
+
+		line = userStyle.Render(username) + " " +
+			tsStyle.Render(msg.Time().Format("15:04")) + "\n" +
+			textStyle.Render(text)
 	}
-
-	userStyle := styles.MessageUsername.Foreground(styles.ColorForUser(msg.UserID))
-	tsStyle := styles.MessageTimestamp
-	textStyle := styles.MessageText.MaxWidth(maxWidth)
-
-	line := userStyle.Render(username) + " " +
-		tsStyle.Render(msg.Time().Format("15:04")) + "\n" +
-		textStyle.Render(text)
 
 	if msg.ReplyCount > 0 {
 		line += "\n" + styles.MessageReaction.Render(fmt.Sprintf("💬 %d replies", msg.ReplyCount))
@@ -247,8 +295,8 @@ func (m Model) renderMessage(msg slack.Message, selected bool, maxWidth int) str
 		return lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(lipgloss.Color("63")).
-			MaxWidth(maxWidth).
+			Width(maxWidth).
 			Render(line)
 	}
-	return lipgloss.NewStyle().PaddingLeft(2).MaxWidth(maxWidth).Render(line)
+	return lipgloss.NewStyle().PaddingLeft(2).Width(maxWidth).Render(line)
 }
