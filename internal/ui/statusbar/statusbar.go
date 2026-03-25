@@ -55,7 +55,12 @@ func (m Model) View(width int) string {
 		Background(lipgloss.Color("236")).
 		Render(spaces(gap)) + right
 
-	return styles.StatusBarStyle.Width(width).Render(bar)
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("236")).
+		Width(width).
+		MaxWidth(width).
+		Render(bar)
 }
 
 func spaces(n int) string {
