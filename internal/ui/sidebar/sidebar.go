@@ -1,6 +1,7 @@
 package sidebar
 
 import (
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -41,17 +42,31 @@ func New() Model {
 	}
 }
 
-func (m *Model) SetChannels(channels []slack.Channel) {
+func (m *Model) SetChannels(channels []slack.Channel, starred map[string]bool) {
 	m.items = nil
+
+	sort.Slice(channels, func(i, j int) bool {
+		si := starred[channels[i].ID]
+		sj := starred[channels[j].ID]
+		if si != sj {
+			return si
+		}
+		return channels[i].Name < channels[j].Name
+	})
+
 	m.items = append(m.items, Item{Name: "Channels", IsSection: true})
 	for _, ch := range channels {
 		prefix := "#"
 		if ch.IsPrivate {
 			prefix = "🔒"
 		}
+		name := prefix + " " + ch.Name
+		if starred[ch.ID] {
+			name = "★ " + ch.Name
+		}
 		m.items = append(m.items, Item{
 			ID:        ch.ID,
-			Name:      prefix + " " + ch.Name,
+			Name:      name,
 			IsPrivate: ch.IsPrivate,
 		})
 	}
@@ -288,7 +303,7 @@ func (m Model) View() string {
 		idx := m.filtered[i]
 		item := m.items[idx]
 		if item.IsSection {
-			sectionStyle := styles.SidebarSection.Copy().MarginTop(0)
+			sectionStyle := styles.SidebarSection.Copy().MarginTop(0).MaxWidth(30)
 			if i > 0 && i > m.offset {
 				if lines+2 > viewHeight {
 					break
@@ -298,13 +313,13 @@ func (m Model) View() string {
 			}
 			b.WriteString(sectionStyle.Render(item.Name))
 		} else if i == m.cursor {
-			b.WriteString(styles.SidebarSelected.Render(item.Name))
+			b.WriteString(styles.SidebarSelected.Copy().MaxWidth(30).Render(item.Name))
 		} else {
 			style := styles.SidebarNormal
 			if item.Unread {
 				style = style.Copy().Bold(true)
 			}
-			b.WriteString(style.Render(item.Name))
+			b.WriteString(style.Copy().MaxWidth(30).Render(item.Name))
 		}
 		b.WriteString("\n")
 		lines++
@@ -312,3 +327,4 @@ func (m Model) View() string {
 
 	return lipgloss.NewStyle().Width(30).Height(viewHeight).Render(strings.TrimRight(b.String(), "\n"))
 }
+

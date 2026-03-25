@@ -2,6 +2,7 @@ package slack
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +15,7 @@ type SlackClient interface {
 	AuthTest() (*AuthInfo, error)
 	ListChannels() ([]Channel, error)
 	ListDMs() ([]Conversation, error)
+	ListStarredChannelIDs() (map[string]bool, error)
 	GetHistory(channelID string, cursor string) (*HistoryResult, error)
 	GetThreadReplies(channelID, threadTS string) ([]Message, error)
 	SendMessage(channelID, text string) error
@@ -93,19 +95,19 @@ func (c *Client) AuthTest() (*AuthInfo, error) {
 }
 
 func (c *Client) ListChannels() ([]Channel, error) {
-	params := &slackapi.GetConversationsParameters{
+	params := &slackapi.GetConversationsForUserParameters{
 		Types:           []string{"public_channel", "private_channel"},
 		ExcludeArchived: true,
 		Limit:           200,
 	}
 
 	var channels []Channel
-	maxPages := 3
-	for page := 0; page < maxPages; page++ {
-		convs, cursor, err := c.getConversationsWithRetry(params)
+	for {
+		convs, cursor, err := c.getUserConversationsWithRetry(params)
 		if err != nil {
+			log.Printf("ListChannels stopping after %d channels: %v", len(channels), err)
 			if len(channels) > 0 {
-					return channels, nil
+				return channels, nil
 			}
 			return nil, err
 		}
@@ -114,7 +116,7 @@ func (c *Client) ListChannels() ([]Channel, error) {
 				ID:        ch.ID,
 				Name:      ch.Name,
 				IsPrivate: ch.IsPrivate,
-				IsMember:  ch.IsMember,
+				IsMember:  true,
 				Topic:     ch.Topic.Value,
 			})
 		}
@@ -123,6 +125,7 @@ func (c *Client) ListChannels() ([]Channel, error) {
 		}
 		params.Cursor = cursor
 	}
+	log.Printf("ListChannels loaded %d channels total", len(channels))
 	return channels, nil
 }
 
@@ -151,8 +154,40 @@ func (c *Client) ListDMs() ([]Conversation, error) {
 	return convs, nil
 }
 
+func (c *Client) ListStarredChannelIDs() (map[string]bool, error) {
+	params := slackapi.NewStarsParameters()
+	params.Count = 200
+	items, _, err := c.api.ListStars(params)
+	if err != nil {
+		return nil, err
+	}
+	starred := make(map[string]bool)
+	for _, item := range items {
+		if item.Channel != "" {
+			starred[item.Channel] = true
+		}
+	}
+	log.Printf("ListStarredChannelIDs: %d starred", len(starred))
+	return starred, nil
+}
+
+func (c *Client) getUserConversationsWithRetry(params *slackapi.GetConversationsForUserParameters) ([]slackapi.Channel, string, error) {
+	for attempt := 0; attempt < 5; attempt++ {
+		convs, cursor, err := c.api.GetConversationsForUser(params)
+		if err == nil {
+			return convs, cursor, nil
+		}
+		if rateLimited, delay := isRateLimited(err); rateLimited {
+			time.Sleep(delay)
+			continue
+		}
+		return nil, "", err
+	}
+	return nil, "", fmt.Errorf("rate limited after 5 retries")
+}
+
 func (c *Client) getConversationsWithRetry(params *slackapi.GetConversationsParameters) ([]slackapi.Channel, string, error) {
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := 0; attempt < 5; attempt++ {
 		convs, cursor, err := c.api.GetConversations(params)
 		if err == nil {
 			return convs, cursor, nil
@@ -163,7 +198,7 @@ func (c *Client) getConversationsWithRetry(params *slackapi.GetConversationsPara
 		}
 		return nil, "", err
 	}
-	return nil, "", fmt.Errorf("rate limited after 3 retries")
+	return nil, "", fmt.Errorf("rate limited after 5 retries")
 }
 
 func isRateLimited(err error) (bool, time.Duration) {

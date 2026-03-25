@@ -22,7 +22,10 @@ type SlackClient interface {
 	slack.SlackClient
 }
 
-type channelsLoadedMsg struct{ channels []slack.Channel }
+type channelsLoadedMsg struct {
+	channels []slack.Channel
+	starred  map[string]bool
+}
 type dmsLoadedMsg struct {
 	convs []slack.Conversation
 }
@@ -97,7 +100,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case channelsLoadedMsg:
-		m.sidebar.SetChannels(msg.channels)
+		m.sidebar.SetChannels(msg.channels, msg.starred)
 		return m, m.loadDMs()
 
 	case dmsLoadedMsg:
@@ -312,8 +315,13 @@ func (m Model) loadChannels() tea.Cmd {
 			log.Printf("error loading channels: %v", err)
 			return errMsg{err}
 		}
-		log.Printf("loaded %d channels", len(channels))
-		return channelsLoadedMsg{channels}
+		starred, err := m.client.ListStarredChannelIDs()
+		if err != nil {
+			log.Printf("error loading stars (continuing without): %v", err)
+			starred = nil
+		}
+		log.Printf("loaded %d channels, %d starred", len(channels), len(starred))
+		return channelsLoadedMsg{channels: channels, starred: starred}
 	}
 }
 

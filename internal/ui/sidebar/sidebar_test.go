@@ -12,7 +12,7 @@ func TestNavigateDown(t *testing.T) {
 	m.SetChannels([]slack.Channel{
 		{ID: "C1", Name: "general"},
 		{ID: "C2", Name: "random"},
-	})
+	}, nil)
 
 	if m.CursorIndex() != 1 {
 		t.Errorf("initial cursor = %d, want 1 (first non-section item)", m.CursorIndex())
@@ -28,7 +28,7 @@ func TestNavigateUp(t *testing.T) {
 	m.SetChannels([]slack.Channel{
 		{ID: "C1", Name: "general"},
 		{ID: "C2", Name: "random"},
-	})
+	}, nil)
 
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
@@ -42,7 +42,7 @@ func TestSelectChannel(t *testing.T) {
 	m.SetChannels([]slack.Channel{
 		{ID: "C1", Name: "general"},
 		{ID: "C2", Name: "random"},
-	})
+	}, nil)
 
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
@@ -56,7 +56,7 @@ func TestFilter(t *testing.T) {
 		{ID: "C1", Name: "general"},
 		{ID: "C2", Name: "random"},
 		{ID: "C3", Name: "engineering"},
-	})
+	}, nil)
 
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
