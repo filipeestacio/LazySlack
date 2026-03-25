@@ -13,31 +13,22 @@ A terminal UI for Slack, inspired by LazyGit and LazyDocker. Keyboard-driven wit
 
 ## Authentication
 
-Two methods, selected during first-run setup. The rest of the app is auth-method-agnostic.
+Session token authentication only. The rest of the app is auth-agnostic.
 
 ### Session Token (xoxc + cookie)
 
 - User extracts `xoxc-*` token and `d` cookie from browser dev tools
-- First-run TUI shows step-by-step instructions for Chrome/Firefox/Safari
+- First-run CLI shows step-by-step extraction instructions
 - Validated on startup via `auth.test`; on expiry, prompt re-authentication
 - Stored in config file with 0600 permissions
-
-### User OAuth
-
-- User creates their own Slack app (we provide instructions) and pastes client ID + secret into config
-- Flow: local HTTP server on random port → browser opens Slack OAuth URL → callback receives token
-- Required scopes: `channels:read`, `channels:history`, `chat:write`, `reactions:write`, `users:read`, `im:read`, `im:history`, `mpim:read`, `mpim:history`, `groups:read`, `groups:history`
-- No bundled client ID in the binary — users bring their own app
 
 ### Config Structure
 
 ```yaml
 auth:
-  method: session_token  # or "oauth"
-  token: xoxc-...        # session token or OAuth access token (written back after OAuth callback)
-  cookie: "d=xoxd-..."   # only for session_token method
-  oauth_client_id: ""    # only for oauth method
-  oauth_client_secret: "" # only for oauth method
+  method: session_token
+  token: xoxc-...
+  cookie: "d=xoxd-..."
 workspace:
   name: mycompany
 ```
@@ -231,4 +222,4 @@ lazyslack/
 
 **In scope:** Browse channels/DMs, read messages, send messages, reply to threads, react with emoji, single workspace, polling-based updates.
 
-**Out of scope (future):** Multi-workspace, WebSocket real-time, file uploads, search, notifications, channel management, user presence, typing indicators.
+**Out of scope (v1):** OAuth (requires app installation and typically admin approval), multi-workspace, WebSocket real-time, file uploads, search, notifications, channel management, user presence, typing indicators.

@@ -13,11 +13,9 @@ type Config struct {
 }
 
 type AuthConfig struct {
-	Method            string `yaml:"method"`
-	Token             string `yaml:"token"`
-	Cookie            string `yaml:"cookie,omitempty"`
-	OAuthClientID     string `yaml:"oauth_client_id,omitempty"`
-	OAuthClientSecret string `yaml:"oauth_client_secret,omitempty"`
+	Method string `yaml:"method"`
+	Token  string `yaml:"token"`
+	Cookie string `yaml:"cookie,omitempty"`
 }
 
 type WorkspaceConfig struct {

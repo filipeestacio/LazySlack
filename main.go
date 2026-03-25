@@ -30,41 +30,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.Auth.Method == "oauth" && cfg.Auth.OAuthClientID != "" && cfg.Auth.Token == "" {
-		scopes := []string{
-			"channels:read", "channels:history", "chat:write", "reactions:write",
-			"users:read", "im:read", "im:history", "mpim:read", "mpim:history",
-			"groups:read", "groups:history",
-		}
-		token, err := auth.RunOAuthFlow(cfg.Auth.OAuthClientID, cfg.Auth.OAuthClientSecret, scopes)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "OAuth failed: %v\n", err)
-			os.Exit(1)
-		}
-		cfg.Auth.Token = token
-		if err := config.Save(cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "Error saving config: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
 	if cfg.Auth.Token == "" {
 		fmt.Println("No auth token configured.")
-		fmt.Println("Edit ~/.config/lazyslack/config.yaml with your auth details.")
+		fmt.Println("Edit ~/.config/lazyslack/config.yaml with your Slack session token:")
 		fmt.Println()
-		fmt.Println("Session token method:")
 		fmt.Println("  1. Open Slack in your browser")
-		fmt.Println("  2. Open Developer Tools (F12)")
-		fmt.Println("  3. Go to Application > Cookies, copy the 'd' cookie value")
-		fmt.Println("  4. In Network tab, find any API call, copy the 'Authorization: Bearer xoxc-...' token")
+		fmt.Println("  2. Open Developer Tools (F12) and go to the Network tab")
+		fmt.Println("  3. Find any request to slack.com, copy the 'Authorization: Bearer xoxc-...' header value")
+		fmt.Println("  4. Go to Application > Storage > Cookies, copy the value of the 'd' cookie")
 		fmt.Println()
-		fmt.Println("OAuth method:")
-		fmt.Println("  1. Create a Slack app at https://api.slack.com/apps")
-		fmt.Println("  2. Add user token scopes: channels:read, channels:history, chat:write,")
-		fmt.Println("     reactions:write, users:read, im:read, im:history, mpim:read,")
-		fmt.Println("     mpim:history, groups:read, groups:history")
-		fmt.Println("  3. Set oauth_client_id and oauth_client_secret in config.yaml")
-		fmt.Println("  4. Run lazyslack again to complete the OAuth flow")
+		fmt.Println("Set token and cookie in ~/.config/lazyslack/config.yaml:")
+		fmt.Println("  auth:")
+		fmt.Println("    method: session_token")
+		fmt.Println("    token: xoxc-...")
+		fmt.Println("    cookie: \"d=xoxd-...\"")
 		os.Exit(0)
 	}
 
