@@ -138,6 +138,18 @@ func (m Model) updateNormal(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "/":
 		m.filtering = true
 		m.filterText = ""
+	case "tab":
+		for i := m.cursor; i >= 0; i-- {
+			if m.items[m.filtered[i]].IsSection {
+				if m.items[m.filtered[i]].Name == "Channels" {
+					m.channelsOpen = !m.channelsOpen
+				} else {
+					m.dmsOpen = !m.dmsOpen
+				}
+				m.rebuildFiltered()
+				break
+			}
+		}
 	}
 	return m, nil
 }
@@ -188,6 +200,38 @@ func (m *Model) applyFilter() {
 			m.cursor = i
 			break
 		}
+	}
+}
+
+func (m *Model) rebuildFiltered() {
+	m.filtered = nil
+	inChannels := false
+	inDMs := false
+	for i, item := range m.items {
+		if item.IsSection {
+			if item.Name == "Channels" {
+				inChannels = true
+				inDMs = false
+			} else {
+				inChannels = false
+				inDMs = true
+			}
+			m.filtered = append(m.filtered, i)
+			continue
+		}
+		if inChannels && !m.channelsOpen {
+			continue
+		}
+		if inDMs && !m.dmsOpen {
+			continue
+		}
+		m.filtered = append(m.filtered, i)
+	}
+	if m.cursor >= len(m.filtered) {
+		m.cursor = len(m.filtered) - 1
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
 	}
 }
 

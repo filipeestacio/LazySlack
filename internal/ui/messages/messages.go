@@ -22,6 +22,8 @@ type OpenComposeMsg struct {
 
 type RequestPaginationMsg struct{}
 
+type CopyMsg struct{ Text string }
+
 type Model struct {
 	messages    []slack.Message
 	cursor      int
@@ -108,6 +110,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		name := m.channelName
 		return m, func() tea.Msg {
 			return OpenComposeMsg{ChannelID: id, ChannelName: name}
+		}
+	case "y":
+		if sel := m.SelectedMessage(); sel != nil {
+			text := sel.Text
+			return m, func() tea.Msg { return CopyMsg{Text: text} }
 		}
 	}
 	return m, nil

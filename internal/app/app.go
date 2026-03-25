@@ -1,6 +1,9 @@
 package app
 
 import (
+	"os/exec"
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/filipeestacio/lazyslack/internal/slack"
@@ -163,6 +166,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case help.CloseMsg:
 		m.showHelp = false
 		return m, nil
+
+	case messages.CopyMsg:
+		return m, func() tea.Msg {
+			cmd := exec.Command("pbcopy")
+			cmd.Stdin = strings.NewReader(msg.Text)
+			cmd.Run()
+			return nil
+		}
 
 	case messageSentMsg:
 		return m, nil
