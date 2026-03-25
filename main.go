@@ -80,7 +80,8 @@ func main() {
 	}
 
 	client := islack.NewClient(cfg.Auth.Token, cfg.Auth.Cookie)
-	model := app.AsTeaModel(app.New(client, workspace))
+	userCache := islack.NewUserCache(client)
+	model := app.AsTeaModel(app.New(client, userCache, workspace))
 
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {

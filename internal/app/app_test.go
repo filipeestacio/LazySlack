@@ -62,5 +62,5 @@ func TestNewMessagesUpdateView(t *testing.T) {
 }
 
 func newTestApp() Model {
-	return New(nil, "testcorp")
+	return New(nil, nil, "testcorp")
 }

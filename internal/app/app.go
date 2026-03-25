@@ -20,7 +20,6 @@ type SlackClient interface {
 type channelsLoadedMsg struct{ channels []slack.Channel }
 type dmsLoadedMsg struct {
 	convs []slack.Conversation
-	users []slack.User
 }
 type historyLoadedMsg struct{ result *slack.HistoryResult }
 type threadLoadedMsg struct{ messages []slack.Message }
@@ -31,6 +30,7 @@ type newMessagesMsg struct{ messages []slack.Message }
 
 type Model struct {
 	client    SlackClient
+	cache     *slack.UserCache
 	workspace string
 	width     int
 	height    int
@@ -55,10 +55,11 @@ type Model struct {
 	users []slack.User
 }
 
-func New(client SlackClient, workspace string) Model {
-	renderer := slack.NewRenderer(nil)
+func New(client SlackClient, cache *slack.UserCache, workspace string) Model {
+	renderer := slack.NewRenderer(cache)
 	return Model{
 		client:    client,
+		cache:     cache,
 		workspace: workspace,
 		sidebar:   sidebar.New(),
 		messages:  messages.New(renderer),
@@ -95,17 +96,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, m.loadDMs()
 
 	case dmsLoadedMsg:
-		userMap := make(map[string]string, len(msg.users))
-		for _, u := range msg.users {
-			name := u.DisplayName
-			if name == "" {
-				name = u.Name
-			}
-			userMap[u.ID] = name
-		}
 		resolve := func(id string) string {
-			if name, ok := userMap[id]; ok {
-				return name
+			if m.cache != nil {
+				return m.cache.ResolveUser(id)
 			}
 			return id
 		}
@@ -295,16 +288,18 @@ func (m Model) loadDMs() tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
+	cache := m.cache
 	return func() tea.Msg {
 		convs, err := m.client.ListDMs()
 		if err != nil {
 			return errMsg{err}
 		}
-		users, err := m.client.GetUsers()
-		if err != nil {
-			return errMsg{err}
+		if cache != nil {
+			if err := cache.Load(); err != nil {
+				return errMsg{err}
+			}
 		}
-		return dmsLoadedMsg{convs: convs, users: users}
+		return dmsLoadedMsg{convs: convs}
 	}
 }
 
