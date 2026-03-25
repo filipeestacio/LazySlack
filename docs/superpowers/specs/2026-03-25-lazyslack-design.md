@@ -34,7 +34,7 @@ Two methods, selected during first-run setup. The rest of the app is auth-method
 ```yaml
 auth:
   method: session_token  # or "oauth"
-  token: xoxc-...
+  token: xoxc-...        # session token or OAuth access token (written back after OAuth callback)
   cookie: "d=xoxd-..."   # only for session_token method
   oauth_client_id: ""    # only for oauth method
   oauth_client_secret: "" # only for oauth method
@@ -100,6 +100,7 @@ type SlackClient interface {
 
 - Background goroutine polls `GetHistory` for the active channel every 3 seconds (configurable)
 - New messages dispatched as `NewMessagesMsg` Bubble Tea commands
+- Channel switch triggers an immediate fetch; polling resumes on the new channel's cadence
 - Polling pauses when no channel is selected
 - Exponential backoff on transient errors
 
@@ -149,7 +150,7 @@ Vim-style single-key commands. All shortcuts active in normal mode. Compose over
 |-----|--------|
 | `c` | Open compose overlay (send message / reply in thread) |
 | `t` | Open thread overlay for selected message |
-| `r` | Open emoji reaction picker |
+| `r` | Open emoji reaction picker (standard Unicode emoji, fuzzy-searchable) |
 | `y` | Copy message text to clipboard |
 | `?` | Show help overlay (all keybindings) |
 | `Esc` | Close overlay / cancel compose |
