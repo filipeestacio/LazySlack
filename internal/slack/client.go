@@ -44,7 +44,7 @@ func NewClient(token, cookie string, opts ...ClientOption) *Client {
 	options := []slackapi.Option{}
 	if cookie != "" {
 		options = append(options, slackapi.OptionHTTPClient(&http.Client{
-			Transport: &cookieTransport{cookie: cookie},
+			Transport: &cookieTransport{cookie: cookie, token: token},
 		}))
 	}
 	if c.baseURL != "" {
@@ -57,10 +57,14 @@ func NewClient(token, cookie string, opts ...ClientOption) *Client {
 
 type cookieTransport struct {
 	cookie string
+	token  string
 }
 
 func (t *cookieTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Cookie", t.cookie)
+	if t.token != "" {
+		req.Header.Set("Authorization", "Bearer "+t.token)
+	}
 	return http.DefaultTransport.RoundTrip(req)
 }
 
