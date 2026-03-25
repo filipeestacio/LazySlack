@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/filipeestacio/lazyslack/internal/slack"
 	"github.com/filipeestacio/lazyslack/internal/ui/styles"
 )
@@ -27,6 +28,7 @@ type CopyMsg struct{ Text string }
 type Model struct {
 	messages    []slack.Message
 	cursor      int
+	offset      int
 	channelID   string
 	channelName string
 	width       int
@@ -41,6 +43,7 @@ func New(renderer *slack.Renderer) Model {
 func (m *Model) SetMessages(msgs []slack.Message) {
 	m.messages = msgs
 	m.cursor = 0
+	m.offset = 0
 }
 
 func (m *Model) AppendMessages(msgs []slack.Message) {
@@ -52,6 +55,7 @@ func (m *Model) SetChannel(id, name string) {
 	m.channelName = name
 	m.messages = nil
 	m.cursor = 0
+	m.offset = 0
 }
 
 func (m *Model) SetSize(w, h int) {
@@ -82,18 +86,22 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "j", "down":
 		if m.cursor < len(m.messages)-1 {
 			m.cursor++
+			m.scrollToCursor()
 		}
 	case "k", "up":
 		if m.cursor > 0 {
 			m.cursor--
+			m.scrollToCursor()
 		} else {
 			return m, func() tea.Msg { return RequestPaginationMsg{} }
 		}
 	case "g":
 		m.cursor = 0
+		m.offset = 0
 	case "G":
 		if len(m.messages) > 0 {
 			m.cursor = len(m.messages) - 1
+			m.scrollToCursor()
 		}
 	case "t":
 		sel := m.SelectedMessage()
@@ -120,24 +128,91 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) scrollToCursor() {
+	if m.cursor < m.offset {
+		m.offset = m.cursor
+		return
+	}
+
+	viewH := m.height - 2
+	if viewH < 1 {
+		viewH = 20
+	}
+
+	for m.offset < m.cursor {
+		lines := 0
+		for i := m.offset; i <= m.cursor && i < len(m.messages); i++ {
+			lines += m.messageLineCount(m.messages[i])
+		}
+		if lines <= viewH {
+			break
+		}
+		m.offset++
+	}
+}
+
+func (m Model) messageLineCount(msg slack.Message) int {
+	text := msg.Text
+	if m.renderer != nil {
+		text = m.renderer.RenderPlain(text)
+	}
+
+	contentW := m.width - 4
+	if contentW < 20 {
+		contentW = 20
+	}
+
+	lines := 1
+	for _, line := range strings.Split(text, "\n") {
+		if len(line) == 0 {
+			lines++
+		} else {
+			lines += (len(line) + contentW - 1) / contentW
+		}
+	}
+
+	if msg.ReplyCount > 0 || len(msg.Reactions) > 0 {
+		lines++
+	}
+
+	return lines
+}
+
 func (m Model) View() string {
 	if m.channelID == "" {
 		return styles.MessagesStyle.Render("Select a channel")
 	}
 
-	var b strings.Builder
-	header := styles.SidebarSection.Render("#" + m.channelName)
-	b.WriteString(header + "\n\n")
-
-	for i, msg := range m.messages {
-		b.WriteString(m.renderMessage(msg, i == m.cursor))
-		b.WriteString("\n")
+	viewH := m.height - 2
+	if viewH < 1 {
+		viewH = 20
+	}
+	contentW := m.width - 2
+	if contentW < 20 {
+		contentW = 20
 	}
 
-	return styles.MessagesStyle.Render(b.String())
+	var b strings.Builder
+	header := styles.SidebarSection.Copy().MarginTop(0).Render("#" + m.channelName)
+	b.WriteString(header + "\n")
+
+	lines := 0
+	for i := m.offset; i < len(m.messages) && lines < viewH; i++ {
+		rendered := m.renderMessage(m.messages[i], i == m.cursor, contentW)
+		msgLines := strings.Count(rendered, "\n") + 1
+		if lines+msgLines > viewH {
+			break
+		}
+		b.WriteString(rendered)
+		b.WriteString("\n")
+		lines += msgLines
+	}
+
+	return lipgloss.NewStyle().Width(m.width).Height(m.height).Render(
+		strings.TrimRight(b.String(), "\n"))
 }
 
-func (m Model) renderMessage(msg slack.Message, selected bool) string {
+func (m Model) renderMessage(msg slack.Message, selected bool, maxWidth int) string {
 	text := msg.Text
 	if m.renderer != nil {
 		text = m.renderer.RenderPlain(text)
@@ -150,7 +225,7 @@ func (m Model) renderMessage(msg slack.Message, selected bool) string {
 
 	userStyle := styles.MessageUsername.Foreground(styles.ColorForUser(msg.UserID))
 	tsStyle := styles.MessageTimestamp
-	textStyle := styles.MessageText
+	textStyle := styles.MessageText.MaxWidth(maxWidth)
 
 	line := userStyle.Render(username) + " " +
 		tsStyle.Render(msg.Time().Format("15:04")) + "\n" +
@@ -165,7 +240,11 @@ func (m Model) renderMessage(msg slack.Message, selected bool) string {
 	}
 
 	if selected {
-		return styles.SidebarSelected.Render(line)
+		return lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(lipgloss.Color("63")).
+			MaxWidth(maxWidth).
+			Render(line)
 	}
-	return line
+	return lipgloss.NewStyle().PaddingLeft(2).MaxWidth(maxWidth).Render(line)
 }
