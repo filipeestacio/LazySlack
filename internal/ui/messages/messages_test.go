@@ -8,7 +8,7 @@ import (
 )
 
 func TestSetMessages(t *testing.T) {
-	m := New(nil)
+	m := New(nil, nil)
 	m.SetMessages([]slack.Message{
 		{Text: "hello", Timestamp: "1706000001.000000", UserID: "U1"},
 		{Text: "world", Timestamp: "1706000002.000000", UserID: "U2"},
@@ -19,7 +19,7 @@ func TestSetMessages(t *testing.T) {
 }
 
 func TestNavigateMessages(t *testing.T) {
-	m := New(nil)
+	m := New(nil, nil)
 	m.SetMessages([]slack.Message{
 		{Text: "first", Timestamp: "1706000001.000000"},
 		{Text: "second", Timestamp: "1706000002.000000"},
@@ -38,7 +38,7 @@ func TestNavigateMessages(t *testing.T) {
 }
 
 func TestOpenThread(t *testing.T) {
-	m := New(nil)
+	m := New(nil, nil)
 	m.SetMessages([]slack.Message{
 		{Text: "has thread", Timestamp: "1706000001.000000", ThreadTS: "1706000001.000000", ReplyCount: 3},
 	})
@@ -50,7 +50,7 @@ func TestOpenThread(t *testing.T) {
 }
 
 func TestJumpToBottom(t *testing.T) {
-	m := New(nil)
+	m := New(nil, nil)
 	m.SetMessages([]slack.Message{
 		{Text: "a", Timestamp: "1"},
 		{Text: "b", Timestamp: "2"},

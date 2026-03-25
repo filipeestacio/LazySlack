@@ -1,6 +1,9 @@
 package slack
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 type UserFetcher interface {
 	GetUsers() ([]User, error)
@@ -27,6 +30,7 @@ func (c *UserCache) Load() error {
 	}
 	users, err := c.fetcher.GetUsers()
 	if err != nil {
+		log.Printf("user cache: GetUsers failed: %v", err)
 		return err
 	}
 	c.mu.Lock()
@@ -34,6 +38,7 @@ func (c *UserCache) Load() error {
 	for _, u := range users {
 		c.users[u.ID] = u
 	}
+	log.Printf("user cache: loaded %d users", len(c.users))
 	return nil
 }
 

@@ -329,9 +329,12 @@ func (c *Client) GetUsers() ([]User, error) {
 
 	users := make([]User, 0, len(slackUsers))
 	for _, u := range slackUsers {
-		displayName := u.Profile.DisplayName
+		displayName := u.Profile.RealName
 		if displayName == "" {
 			displayName = u.RealName
+		}
+		if displayName == "" {
+			displayName = u.Profile.DisplayName
 		}
 		users = append(users, User{
 			ID:          u.ID,

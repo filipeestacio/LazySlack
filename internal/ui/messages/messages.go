@@ -34,10 +34,11 @@ type Model struct {
 	width       int
 	height      int
 	renderer    *slack.Renderer
+	resolver    slack.UserResolver
 }
 
-func New(renderer *slack.Renderer) Model {
-	return Model{renderer: renderer}
+func New(renderer *slack.Renderer, resolver slack.UserResolver) Model {
+	return Model{renderer: renderer, resolver: resolver}
 }
 
 func (m *Model) SetMessages(msgs []slack.Message) {
@@ -218,7 +219,10 @@ func (m Model) renderMessage(msg slack.Message, selected bool, maxWidth int) str
 		text = m.renderer.RenderPlain(text)
 	}
 
-	username := msg.Username
+	username := msg.UserID
+	if m.resolver != nil {
+		username = m.resolver.ResolveUser(msg.UserID)
+	}
 	if username == "" {
 		username = msg.UserID
 	}

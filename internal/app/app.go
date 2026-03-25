@@ -70,7 +70,7 @@ func New(client SlackClient, cache *slack.UserCache, workspace string) Model {
 		cache:     cache,
 		workspace: workspace,
 		sidebar:   sidebar.New(),
-		messages:  messages.New(renderer),
+		messages:  messages.New(renderer, cache),
 		thread:    thread.New(renderer),
 		input:     input.New("", "", ""),
 		emoji:     emoji.New("", ""),
@@ -337,7 +337,7 @@ func (m Model) loadDMs() tea.Cmd {
 		}
 		if cache != nil {
 			if err := cache.Load(); err != nil {
-				return errMsg{err}
+				log.Printf("user cache load failed: %v", err)
 			}
 		}
 		return dmsLoadedMsg{convs: convs}
