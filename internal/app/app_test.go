@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/filipeestacio/lazyslack/internal/slack"
 )
 
 func TestFocusSwitching(t *testing.T) {
@@ -43,6 +44,20 @@ func TestHelpToggle(t *testing.T) {
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	if m.showHelp {
 		t.Error("expected help to be hidden")
+	}
+}
+
+func TestNewMessagesUpdateView(t *testing.T) {
+	m := newTestApp()
+	m.messages.SetChannel("C1", "#test")
+
+	newMsgs := []slack.Message{
+		{Text: "new msg", Timestamp: "1706000010.000000", UserID: "U1"},
+	}
+
+	m, _ = m.Update(newMessagesMsg{messages: newMsgs})
+	if sel := m.messages.SelectedMessage(); sel == nil || sel.Text != "new msg" {
+		t.Error("expected new message to appear in messages view")
 	}
 }
 
